@@ -27,4 +27,6 @@ terraform {
 
 provider "azurerm" {
   features {}
+  # Desativa a varredura e registro de todos os provedores da Azure
+  resource_provider_registrations = "none"
 }
