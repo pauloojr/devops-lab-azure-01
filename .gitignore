@@ -1,0 +1,23 @@
+# Terraform local artifacts & providers
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv/
+env/
+venv/
+
+# OS / Editor artifacts
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,86 @@
+name: "CI/CD Pipeline - Azure Container Delivery"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  lint-and-iac-scan:
+    name: "Validate & Scan IaC"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.0"
+
+      - name: Terraform Format Check
+        run: terraform -chdir=terraform fmt -check
+
+      - name: Run Checkov IaC Security Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/
+          framework: terraform
+          soft_fail: false
+          output_format: cli
+
+  build-scan-push:
+    name: "Build, Scan & Push to ACR"
+    needs: [lint-and-iac-scan]
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: "fastapi-portfolio"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Image Locally
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Azure Login via OIDC
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Push Container to Azure ACR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          ACR_SERVER="${{ secrets.AZURE_ACR_SERVER }}"
+          az acr login --name $ACR_SERVER
+          
+          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} $ACR_SERVER/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} $ACR_SERVER/${{ env.IMAGE_NAME }}:latest
+          
+          docker push $ACR_SERVER/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push $ACR_SERVER/${{ env.IMAGE_NAME }}:latest
