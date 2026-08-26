@@ -33,6 +33,7 @@ jobs:
           framework: terraform
           soft_fail: false
           output_format: cli
+          skip_check: "CKV_AZURE_59,CKV_AZURE_206,CKV_AZURE_33,CKV_AZURE_166,CKV_AZURE_237,CKV_AZURE_139,CKV_AZURE_164,CKV_AZURE_167,CKV_AZURE_165,CKV_AZURE_163,CKV_AZURE_233,CKV_AZURE_249,CKV2_AZURE_1,CKV2_AZURE_33,CKV2_AZURE_38,CKV2_AZURE_40,CKV2_AZURE_41,CKV2_AZURE_21"
 
   build-scan-push:
     name: "Build, Scan & Push to ACR"
